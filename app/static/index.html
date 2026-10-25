@@ -1,0 +1,434 @@
+<!doctype html>
+<!--
+  Front-end for the EE API.
+  Plain HTML + CSS + JavaScript, no frameworks, no build step.
+  Every calculation is done by the Python API (fetch("/resistor?...") etc.),
+  so this page is only the "face": it sends numbers and shows the answers.
+  Designed with love by Petch.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Petch's EE Lab</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fff5f8;
+    --bg2: #fde8f0;
+    --card: #ffffff;
+    --ink: #5b3a4a;
+    --ink-soft: #9b7a8a;
+    --pink: #ff8fb8;
+    --pink-deep: #f0609a;
+    --lav: #c9b6ff;
+    --mint: #a8e6cf;
+    --butter: #ffe9a8;
+    --line: #f6d3e1;
+    --shadow: 0 10px 30px rgba(240, 96, 154, 0.15);
+    --radius: 26px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: "Quicksand", ui-rounded, system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 10% 10%, #ffe1ec 0, transparent 40%),
+      radial-gradient(circle at 90% 20%, #ece4ff 0, transparent 35%),
+      radial-gradient(circle at 50% 100%, #e3f8ef 0, transparent 45%),
+      var(--bg);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* floating hearts in the background, purely decorative */
+  .floaters span {
+    position: fixed; bottom: -40px; font-size: 22px; opacity: .35;
+    animation: floatUp linear infinite; pointer-events: none; z-index: 0;
+  }
+  @keyframes floatUp {
+    to { transform: translateY(-115vh) rotate(25deg); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .floaters { display: none; } }
+
+  .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 32px 16px 48px; }
+
+  header { text-align: center; margin-bottom: 22px; }
+  .badge {
+    display: inline-block; background: var(--card); border: 2px solid var(--line);
+    padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 13px;
+    color: var(--pink-deep); box-shadow: var(--shadow);
+  }
+  h1 {
+    font-family: "Fredoka", sans-serif; font-weight: 700;
+    font-size: clamp(34px, 7vw, 52px); margin: 14px 0 4px; letter-spacing: .5px;
+    color: var(--pink-deep);
+    text-shadow: 3px 3px 0 #ffd6e6;
+  }
+  .sub { color: var(--ink-soft); font-weight: 600; margin: 0; }
+
+  .tabs {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    background: var(--card); padding: 8px; border-radius: 999px;
+    border: 2px solid var(--line); box-shadow: var(--shadow); margin: 24px auto;
+    width: fit-content; max-width: 100%;
+  }
+  .tab {
+    font: inherit; font-weight: 700; border: 0; cursor: pointer;
+    padding: 10px 18px; border-radius: 999px; background: transparent; color: var(--ink-soft);
+    transition: all .2s;
+  }
+  .tab:hover { color: var(--pink-deep); }
+  .tab[aria-selected="true"] { background: var(--pink); color: #fff; box-shadow: 0 4px 0 var(--pink-deep); }
+
+  .card {
+    background: var(--card); border-radius: var(--radius); border: 2px solid var(--line);
+    box-shadow: var(--shadow); padding: 26px; position: relative;
+  }
+  .card h2 { font-family: "Fredoka", sans-serif; font-weight: 600; margin: 0 0 4px; font-size: 26px; }
+  .card .hint { margin: 0 0 18px; color: var(--ink-soft); font-weight: 600; font-size: 15px; }
+  .panel[hidden] { display: none; }
+
+  /* ---------- result bubble ---------- */
+  .result {
+    margin-top: 20px; text-align: center; padding: 18px; border-radius: 20px;
+    background: linear-gradient(135deg, #ffe3ee, #efe7ff);
+    border: 2px dashed var(--pink);
+  }
+  .result .big { font-family: "Fredoka", sans-serif; font-size: clamp(30px, 7vw, 44px); font-weight: 700; color: var(--pink-deep); }
+  .result .small { color: var(--ink-soft); font-weight: 700; margin-top: 4px; }
+  .result.error { background: #fff0f0; border-color: #ff9a9a; }
+  .result.error .big { font-size: 20px; color: #d9534f; }
+  .pop { animation: pop .35s ease; }
+  @keyframes pop { 0% { transform: scale(.94); } 60% { transform: scale(1.03); } 100% { transform: scale(1); } }
+
+  /* ---------- resistor ---------- */
+  .resistor-svg { width: 100%; max-width: 460px; display: block; margin: 0 auto 8px; }
+  .toggle { display: flex; justify-content: center; gap: 8px; margin-bottom: 14px; }
+  .chip {
+    font: inherit; font-weight: 700; cursor: pointer; border: 2px solid var(--line);
+    background: #fff; color: var(--ink-soft); padding: 6px 14px; border-radius: 999px;
+  }
+  .chip[aria-pressed="true"] { border-color: var(--pink); color: var(--pink-deep); background: #fff0f6; }
+  .band-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1.5px dashed var(--line); flex-wrap: wrap; }
+  .band-row:first-of-type { border-top: 0; }
+  .band-label { width: 104px; font-weight: 700; font-size: 14px; color: var(--ink-soft); flex-shrink: 0; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sw {
+    width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+    border: 2px solid rgba(0,0,0,.12); padding: 0; transition: transform .15s;
+  }
+  .sw:hover { transform: scale(1.15); }
+  .sw[aria-checked="true"] { outline: 3px solid var(--pink-deep); outline-offset: 2px; transform: scale(1.1); }
+
+  /* ---------- forms ---------- */
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+  label.field { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 14px; color: var(--ink-soft); }
+  label.field input {
+    font: inherit; font-size: 18px; font-weight: 700; color: var(--ink);
+    padding: 12px 14px; border-radius: 16px; border: 2px solid var(--line); background: #fffafc;
+    outline: none; width: 100%;
+  }
+  label.field input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #ffe1ec; }
+  .unit { font-weight: 600; font-size: 12px; }
+  .note { font-size: 13px; color: var(--ink-soft); font-weight: 600; margin-top: 12px; text-align: center; }
+  .divider-svg { width: 100%; max-width: 260px; display: block; margin: 0 auto 14px; }
+
+  footer { text-align: center; margin-top: 30px; color: var(--ink-soft); font-weight: 600; font-size: 14px; }
+  footer .love { font-family: "Fredoka", sans-serif; font-size: 18px; color: var(--pink-deep); }
+  footer a { color: var(--pink-deep); }
+  footer code { background: #fff; border: 1.5px solid var(--line); padding: 2px 8px; border-radius: 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="floaters" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header>
+    <span class="badge">✿ a little lab for Austin ✿</span>
+    <h1>Petch's EE Lab</h1>
+    <p class="sub">tiny calculators for big circuits ⚡</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-panel="resistor">🎀 Resistor</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="ohm">💡 Ohm's Law</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="divider">🔋 Divider</button>
+  </nav>
+
+  <!-- ================= RESISTOR ================= -->
+  <section class="card panel" id="panel-resistor">
+    <h2>Resistor color code</h2>
+    <p class="hint">Tap the colors you see on the resistor, left to right.</p>
+
+    <svg class="resistor-svg" viewBox="0 0 320 100" aria-label="Resistor preview">
+      <line x1="0" y1="50" x2="70" y2="50" stroke="#c7b0bb" stroke-width="5" stroke-linecap="round"/>
+      <line x1="250" y1="50" x2="320" y2="50" stroke="#c7b0bb" stroke-width="5" stroke-linecap="round"/>
+      <rect x="66" y="22" width="188" height="56" rx="26" fill="#ffe2c6" stroke="#f2c49b" stroke-width="3"/>
+      <g id="bandsSvg"></g>
+      <ellipse cx="120" cy="34" rx="34" ry="5" fill="#fff" opacity=".5"/>
+    </svg>
+
+    <div class="toggle">
+      <button class="chip" data-count="4" aria-pressed="true">4 bands</button>
+      <button class="chip" data-count="5" aria-pressed="false">5 bands</button>
+    </div>
+
+    <div id="bandRows"></div>
+
+    <div class="result" id="resResult" aria-live="polite">
+      <div class="big">…</div><div class="small">&nbsp;</div>
+    </div>
+  </section>
+
+  <!-- ================= OHM'S LAW ================= -->
+  <section class="card panel" id="panel-ohm" hidden>
+    <h2>Ohm's law <span style="color:var(--pink)">V = I × R</span></h2>
+    <p class="hint">Fill in any two boxes and I'll figure out the third.</p>
+    <div class="fields">
+      <label class="field">Voltage <span class="unit">volts (V)</span><input id="ohmV" type="number" step="any" inputmode="decimal" placeholder="e.g. 3"></label>
+      <label class="field">Current <span class="unit">amps (A)</span><input id="ohmI" type="number" step="any" inputmode="decimal" placeholder="e.g. 0.02"></label>
+      <label class="field">Resistance <span class="unit">ohms (Ω)</span><input id="ohmR" type="number" step="any" inputmode="decimal" placeholder="e.g. 150"></label>
+    </div>
+    <div class="result" id="ohmResult" aria-live="polite">
+      <div class="big">fill two boxes ♡</div><div class="small">&nbsp;</div>
+    </div>
+    <p class="note">Tip: an LED on 3 V wanting 0.02 A → you need about 150 Ω.</p>
+  </section>
+
+  <!-- ================= DIVIDER ================= -->
+  <section class="card panel" id="panel-divider" hidden>
+    <h2>Voltage divider</h2>
+    <p class="hint">Two resistors in a row turn a big voltage into a smaller one.</p>
+
+    <svg class="divider-svg" viewBox="0 0 200 230" aria-label="Voltage divider schematic">
+      <g stroke="#c7b0bb" stroke-width="4" fill="none" stroke-linecap="round">
+        <line x1="70" y1="20" x2="70" y2="45"/>
+        <line x1="70" y1="105" x2="70" y2="135"/>
+        <line x1="70" y1="195" x2="70" y2="215"/>
+        <line x1="70" y1="120" x2="150" y2="120"/>
+        <line x1="50" y1="215" x2="90" y2="215"/>
+      </g>
+      <rect x="55" y="45" width="30" height="60" rx="10" fill="#ffd6e6" stroke="#f0609a" stroke-width="3"/>
+      <rect x="55" y="135" width="30" height="60" rx="10" fill="#e6dcff" stroke="#9b85e8" stroke-width="3"/>
+      <circle cx="70" cy="20" r="6" fill="#f0609a"/>
+      <circle cx="150" cy="120" r="6" fill="#9b85e8"/>
+      <g font-family="Fredoka, sans-serif" font-weight="600" font-size="15" fill="#5b3a4a">
+        <text x="82" y="24">Vin</text>
+        <text x="95" y="80">R1</text>
+        <text x="95" y="170">R2</text>
+        <text x="138" y="108">Vout</text>
+        <text x="100" y="220" font-size="12" fill="#9b7a8a">ground</text>
+      </g>
+    </svg>
+
+    <div class="fields">
+      <label class="field">Vin <span class="unit">volts (V)</span><input id="dvVin" type="number" step="any" inputmode="decimal" value="5"></label>
+      <label class="field">R1 <span class="unit">ohms (Ω)</span><input id="dvR1" type="number" step="any" inputmode="decimal" value="10000"></label>
+      <label class="field">R2 <span class="unit">ohms (Ω)</span><input id="dvR2" type="number" step="any" inputmode="decimal" value="15000"></label>
+    </div>
+    <div class="result" id="dvResult" aria-live="polite">
+      <div class="big">…</div><div class="small">&nbsp;</div>
+    </div>
+    <p class="note">Tip: an ESP32 pin can only read up to 3.3 V, so use this to bring 5 V down safely.</p>
+  </section>
+
+  <footer>
+    <div class="love">made with 💗 by Petch, for Austin</div>
+    <div style="margin-top:8px">
+      for nerds: <a href="/docs">/docs</a> · build <code id="ver">…</code>
+    </div>
+  </footer>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------------
+const $ = (sel) => document.querySelector(sel);
+
+// Ask the Python API for an answer. Returns the JSON, or throws with its error message.
+async function api(path, params) {
+  const url = path + "?" + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Something went wrong");
+  return data;
+}
+
+function show(box, big, small = " ", isError = false) {
+  box.classList.toggle("error", isError);
+  box.querySelector(".big").textContent = big;
+  box.querySelector(".small").textContent = small;
+  box.classList.remove("pop"); void box.offsetWidth; box.classList.add("pop");
+}
+
+// Turn 0.0213 into "21.3 m", 4700 into "4.7 k", etc.
+function si(n) {
+  if (n === 0) return "0 ";
+  const units = [[1e9,"G"],[1e6,"M"],[1e3,"k"],[1,""],[1e-3,"m"],[1e-6,"µ"]];
+  for (const [f, s] of units) if (Math.abs(n) >= f) return +(n / f).toPrecision(4) + " " + s;
+  return n.toExponential(2) + " ";
+}
+
+// Wait until the user stops typing for a moment before calling the API.
+function debounce(fn, ms = 250) {
+  let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+// ---------------------------------------------------------------------------
+// Tabs
+// ---------------------------------------------------------------------------
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", t === tab));
+    document.querySelectorAll(".panel").forEach((p) => (p.hidden = p.id !== "panel-" + tab.dataset.panel));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Resistor
+// ---------------------------------------------------------------------------
+const COLORS = {
+  black: "#2b2b2b", brown: "#8b5a2b", red: "#ef4444", orange: "#fb923c",
+  yellow: "#facc15", green: "#22c55e", blue: "#3b82f6", violet: "#a855f7",
+  grey: "#9ca3af", white: "#ffffff", gold: "#d4af37", silver: "#c0c0c0",
+};
+const DIGIT = ["black","brown","red","orange","yellow","green","blue","violet","grey","white"];
+const MULT  = [...DIGIT, "gold", "silver"];
+const TOL   = ["brown","red","green","blue","violet","grey","gold","silver"];
+
+let bandCount = 4;
+let chosen = { 4: ["yellow","violet","red","gold"], 5: ["brown","black","black","red","brown"] };
+
+function bandSpec(count) {
+  // label, allowed colors, x position on the drawing
+  return count === 4
+    ? [["1st digit", DIGIT, 100], ["2nd digit", DIGIT, 128], ["multiplier", MULT, 156], ["tolerance", TOL, 218]]
+    : [["1st digit", DIGIT, 94], ["2nd digit", DIGIT, 118], ["3rd digit", DIGIT, 142], ["multiplier", MULT, 166], ["tolerance", TOL, 218]];
+}
+
+function drawResistor() {
+  const spec = bandSpec(bandCount);
+  $("#bandsSvg").innerHTML = spec.map(([, , x], i) =>
+    `<rect x="${x}" y="23" width="14" height="54" fill="${COLORS[chosen[bandCount][i]]}" stroke="rgba(0,0,0,.08)"/>`
+  ).join("");
+}
+
+function buildRows() {
+  const rows = $("#bandRows");
+  rows.innerHTML = "";
+  bandSpec(bandCount).forEach(([label, allowed], i) => {
+    const row = document.createElement("div");
+    row.className = "band-row";
+    row.innerHTML = `<div class="band-label">${label}</div><div class="swatches" role="radiogroup" aria-label="${label}"></div>`;
+    const box = row.querySelector(".swatches");
+    allowed.forEach((color) => {
+      const b = document.createElement("button");
+      b.className = "sw";
+      b.title = color;
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-label", color);
+      b.style.background = COLORS[color];
+      b.setAttribute("aria-checked", chosen[bandCount][i] === color);
+      b.addEventListener("click", () => {
+        chosen[bandCount][i] = color;
+        box.querySelectorAll(".sw").forEach((s) => s.setAttribute("aria-checked", s === b));
+        updateResistor();
+      });
+      box.appendChild(b);
+    });
+    rows.appendChild(row);
+  });
+}
+
+async function updateResistor() {
+  drawResistor();
+  const box = $("#resResult");
+  try {
+    const r = await api("/resistor", { bands: chosen[bandCount].join(",") });
+    show(box, r.pretty, `± ${r.tolerance_percent}% tolerance · ${chosen[bandCount].join(" · ")}`);
+  } catch (e) {
+    show(box, e.message, "", true);
+  }
+}
+
+document.querySelectorAll(".toggle .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    bandCount = Number(chip.dataset.count);
+    document.querySelectorAll(".toggle .chip").forEach((c) => c.setAttribute("aria-pressed", c === chip));
+    buildRows();
+    updateResistor();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ohm's law
+// ---------------------------------------------------------------------------
+const ohmInputs = { v: $("#ohmV"), i: $("#ohmI"), r: $("#ohmR") };
+
+const updateOhm = debounce(async () => {
+  const box = $("#ohmResult");
+  const filled = Object.entries(ohmInputs).filter(([, el]) => el.value !== "");
+  if (filled.length < 2) return show(box, "fill two boxes ♡");
+  if (filled.length > 2) return show(box, "only two please!", "clear one box so I know what to solve for", true);
+  try {
+    const r = await api("/ohms-law", Object.fromEntries(filled.map(([k, el]) => [k, el.value])));
+    const missing = Object.keys(ohmInputs).find((k) => ohmInputs[k].value === "");
+    const label = { v: si(r.v) + "V", i: si(r.i) + "A", r: si(r.r) + "Ω" }[missing];
+    const name = { v: "voltage", i: "current", r: "resistance" }[missing];
+    show(box, label, `${name} · power used: ${si(r.p)}W`);
+  } catch (e) {
+    show(box, e.message, "", true);
+  }
+});
+Object.values(ohmInputs).forEach((el) => el.addEventListener("input", updateOhm));
+
+// ---------------------------------------------------------------------------
+// Voltage divider
+// ---------------------------------------------------------------------------
+const updateDivider = debounce(async () => {
+  const box = $("#dvResult");
+  const vin = $("#dvVin").value, r1 = $("#dvR1").value, r2 = $("#dvR2").value;
+  if (vin === "" || r1 === "" || r2 === "") return show(box, "fill all three ♡");
+  try {
+    const r = await api("/divider", { vin, r1, r2 });
+    const safe = r.vout <= 3.3 ? "safe for an ESP32 pin ✓" : "too high for an ESP32 pin (max 3.3 V) ✗";
+    show(box, si(r.vout) + "V", "Vout · " + safe);
+  } catch (e) {
+    show(box, e.message, "", true);
+  }
+});
+["#dvVin", "#dvR1", "#dvR2"].forEach((id) => $(id).addEventListener("input", updateDivider));
+
+// ---------------------------------------------------------------------------
+// Footer: which build is running? (this changes after each CI build)
+// ---------------------------------------------------------------------------
+fetch("/api/info").then((r) => r.json()).then((d) => {
+  $("#ver").textContent = d.version.length > 12 ? d.version.slice(0, 7) : d.version;
+}).catch(() => ($("#ver").textContent = "?"));
+
+// ---------------------------------------------------------------------------
+// Decorative floating hearts
+// ---------------------------------------------------------------------------
+const floaters = document.querySelector(".floaters");
+["💗","✿","♡","⚡","💕","✨","🎀"].forEach((ch, i) => {
+  for (let k = 0; k < 2; k++) {
+    const s = document.createElement("span");
+    s.textContent = ch;
+    s.style.left = Math.random() * 100 + "vw";
+    s.style.animationDuration = 14 + Math.random() * 14 + "s";
+    s.style.animationDelay = -Math.random() * 20 + "s";
+    floaters.appendChild(s);
+  }
+});
+
+// Start
+buildRows();
+updateResistor();
+updateDivider();
+</script>
+</body>
+</html>

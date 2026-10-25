@@ -3,13 +3,15 @@ The web layer. FastAPI turns ordinary Python functions into HTTP endpoints.
 
 Run it locally (without Docker) with:
     uvicorn app.main:app --reload
-then open http://localhost:8000/docs for a clickable test page FastAPI makes for free.
+then open http://localhost:8000 for the web page (made by Petch), or
+http://localhost:8000/docs for the clickable API test page FastAPI makes for free.
 """
 
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app import ee
 
@@ -27,14 +29,23 @@ app = FastAPI(
 )
 
 
-@app.get("/")
-def root():
+# The front-end: one HTML file. It calls the API endpoints below with JavaScript.
+# This is the usual split: the API returns raw data (JSON) for programs like an
+# ESP32, and the web page turns that data into something a human can use.
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.get("/", include_in_schema=False)
+def home():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/api/info")
+def info():
     # APP_VERSION is set by the Dockerfile/CI so you can SEE which build is running.
-    # When CD works, pushing a change should make this value change on its own.
-    return {
-        "message": "EE API is running. Try /docs",
-        "version": os.getenv("APP_VERSION", "dev"),
-    }
+    # The web page shows it in the footer. When CD works, pushing a change should
+    # make this value change on its own.
+    return {"name": "Petch's EE Lab", "version": os.getenv("APP_VERSION", "dev")}
 
 
 @app.get("/health")

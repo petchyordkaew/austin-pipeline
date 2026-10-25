@@ -13,6 +13,7 @@ is the **pipeline around it**. Every file has comments explaining what it does a
 | Piece | What it is | File |
 |---|---|---|
 | Web service | FastAPI app, plain Python | `app/main.py`, `app/ee.py` |
+| Web page | Petch's front-end: buttons and pictures that call the API | `app/static/index.html` |
 | Tests | Prove the math is right; CI runs them on every push | `tests/test_ee.py` |
 | Docker | Packs the app + Python + libraries into one image that runs anywhere | `Dockerfile` |
 | CI | GitHub runs tests and builds the image automatically on push | `.github/workflows/ci.yml` |
@@ -23,6 +24,7 @@ is the **pipeline around it**. Every file has comments explaining what it does a
 ```
 app/ee.py                 the EE math (no web stuff)
 app/main.py               turns the math into HTTP endpoints
+app/static/index.html     the web page humans use (calls the API with JavaScript)
 tests/test_ee.py          automated tests
 requirements*.txt         Python libraries
 Dockerfile                image recipe
@@ -39,10 +41,14 @@ k8s/service.yaml          "give them one address: localhost:8080"
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 pytest                         # 8 tests should pass
-uvicorn app.main:app --reload  # open http://localhost:8000/docs
+uvicorn app.main:app --reload  # open http://localhost:8000 (page) or /docs (API)
 ```
 
 Try: http://localhost:8000/resistor?bands=yellow,violet,red,gold → `4.7 kΩ`
+
+**API vs. web page:** the endpoints (`/resistor`, `/ohms-law`, `/divider`) return raw JSON,
+which is what a program (like an ESP32) wants. The page at `/` is just a friendly face that
+calls those same endpoints. Same backend, two kinds of users.
 
 ## Step 2: Docker
 
@@ -82,7 +88,7 @@ the pipeline go red and refuse to build. That's CI doing its job.
    kubectl apply -f k8s/
    kubectl get pods            # two ee-api pods, STATUS Running
    ```
-3. Open http://localhost:8080/docs
+3. Open http://localhost:8080 for the web page, or http://localhost:8080/docs for the raw API
 
 Things worth trying:
 
@@ -112,4 +118,4 @@ so the options are:
 - **Pull-based (Argo CD / Flux):** a tool inside the cluster watches GitHub and pulls new versions itself. This is how many companies do it.
 - **Cloud cluster:** a real hosted Kubernetes; costs money or needs a free tier.
 
-When it works, `curl localhost:8080/` will show a new `version` (the commit hash) after each push, with no manual steps.
+When it works, the build number in the page footer (or `curl localhost:8080/api/info`) will show a new `version` (the commit hash) after each push, with no manual steps.

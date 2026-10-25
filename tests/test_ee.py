@@ -56,3 +56,15 @@ def test_api_endpoint():
 def test_api_bad_input_returns_400():
     response = client.get("/resistor", params={"bands": "red,red"})
     assert response.status_code == 400
+
+
+def test_home_page_is_served():
+    # The front-end page should load, and it should still say who made it.
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Petch" in response.text
+
+
+def test_info_endpoint():
+    assert client.get("/api/info").json()["version"] == "dev"
