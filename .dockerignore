@@ -1,0 +1,8 @@
+# Files Docker should NOT copy into the image (keeps it small and clean).
+.git
+.github
+.venv
+__pycache__
+tests
+k8s
+*.md

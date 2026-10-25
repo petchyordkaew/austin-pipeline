@@ -1,0 +1,16 @@
+# ---------------------------------------------------------------------------
+# Pods come and go and their addresses change. A Service gives them ONE
+# stable address and spreads requests across all healthy copies.
+# type: LoadBalancer on Docker Desktop makes it reachable at localhost.
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: ee-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: ee-api                   # send traffic to pods with this label
+  ports:
+    - port: 8080                  # open http://localhost:8080
+      targetPort: 8000            # ...which forwards to port 8000 inside the container

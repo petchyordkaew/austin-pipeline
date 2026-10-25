@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------------------
+# A Deployment tells Kubernetes: "keep N copies of this container running."
+# If one crashes, Kubernetes starts a new one. If you change the image,
+# it swaps the old copies for new ones gradually (a "rolling update").
+#
+# Apply:  kubectl apply -f k8s/
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ee-api
+spec:
+  replicas: 2                     # run 2 copies; try `kubectl delete pod <name>` and watch it come back
+  selector:
+    matchLabels:
+      app: ee-api                 # "the pods I manage are the ones labelled app=ee-api"
+  template:                       # the blueprint for each pod
+    metadata:
+      labels:
+        app: ee-api
+    spec:
+      containers:
+        - name: ee-api
+          image: austin-pipeline:local      # the image you built with `docker build`
+          imagePullPolicy: IfNotPresent     # use the local image, don't try to download it
+          ports:
+            - containerPort: 8000
+          # Kubernetes pings /health. If it stops answering, the container is restarted.
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # Only send traffic to the pod once /health answers.
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:              # polite limits so one app can't eat the whole machine
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 250m, memory: 256Mi }

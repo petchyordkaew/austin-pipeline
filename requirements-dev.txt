@@ -1,0 +1,4 @@
+# Extra tools needed only for testing, not inside the production container.
+-r requirements.txt
+pytest==8.3.4
+httpx==0.28.1
